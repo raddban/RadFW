@@ -1,0 +1,960 @@
+V Etom tutoriale napishem svoj framework mini, dlja reshenija prostenjkih zadach
+    1. Versija php 5.4
+    2. Ispoljzujem MAMP server
+    3. Framework budet na patterne MVC
+
+
+
+Nachinajem....
+    1. Sozdajom v projekte papku app, v nej tri papki -> controllers, models, views
+        - razdeljajetsja na tri chasti - kontrolleri, modeli, i vidi.
+        - kontrolleri svjazivajusheje zveno, kotoroje prinimajet/obrabativajet zapros i prinimajet reshenije chto delatj s etim samim zaprosom, v procese vizivajet funkciji modeli
+        - modelj rabotajet s informacijej, s bazoj dannih
+        - views eto otrisovka shablonov v brauzere, objortka dlja poluchennih dannih
+    2. Sozdajom papku public, chasto nazivajut jeshjo web, web_root
+        - chasto nazivajut jeshjo front controller, v nej budet nahoditsja tochka vhoda
+        - v etoj papke budut nahoditsja kartinki, skripti, i vsjakije podobnije fajli, kotorije nam prigodjatsja
+        - sozdajom opredeljonnije papki -> css, js, img
+    3. Sozdajom papku vender, v nej budet nahoditsja jadro nashevo freimworka, i vsjakije biblioteki
+        - pod jadro sozdajom papku core
+        - pod biblioteki sozdajom papku libs
+
+    4. V public papke sozdajom index.php fajl, s kotorovo vsjo nachinajetsa, tochka vhoda nazivajemaja
+        - public/index.php
+        - tak kak dlja otobrazhenija index faila neobhodimo perehoditj v public > index.php, to neobhodimo sozdatj dva faila .htaccess
+        - pervij .htaccess zosdajom v korne projekta i propisivajem sledujushije pravila
+            - RewriteEngine On                       <-- vkljuchajet modulj
+              RewriteRule ^(.*)$ ./public/$1          <-- zapisivajet pravilo perenapravlenija, kotoroje vozjmjot vje zaprosi ^(.*)$, i otopravit ih papku /public/$1, vsjo chto zapomnili (.*) nahoditsja v peremennoj $1, i opravljajem v papku public
+        - v samoj papke public takzhe sozdajom fajl .htaccess
+            - zapishem pravila
+                - RewriteCond %{REQUEST_FILENAME} !-f
+                  RewriteCond %{REQUEST_FILENAME} !-d
+
+                  // jesli eto ne !-f <-filename, i !-d <- ne papka, to vipolnjajem sledujushije pravila pereodresaciji
+
+                  RewriteRule (.*) index.php?$1 [L,QSA]  <- zapomnim vsjo chto napisano v stroke zaprosa i otpravim vsjo v fajl index.php GET parametrom zapomnenoje $1 dobavim
+                            // flag QSA pozvoljajet dobovljatj zaprosi v stroku zaprosov k uzhe imejushimesja
+
+    5. Napisanije marshrutizatora, libo class Router. Sozdajom klass router v papke core
+
+    6. Takzhe poluchajem znachenije zaprosa v stroke v index.php:
+        - $request = $_SERVER['QUERY_STRING']
+        - takzhe podkljuchajem nash klas Router chereq require
+        - sozdajom objekt dannovo klasa
+            - $router = new Router;
+
+    7. v klase Router nam potrebujutsja dva svojstva routes i route kak masivi:
+        - protected static $routes = []; // budet soderzhatsja vesj masiv routov
+        - protected static $route = []; // blagodorja jemu budem vsjegda znatj, kotorij kontroller, metod otrabativajet v dannij moment
+        - sozdajom statichnij metod pod nazvanijem k primeru add(), kotorij primet v sebja 2 parametra:
+            - public static function add($regexp, $route = [])
+                - $regexp - reguljarnoje virazhenije v kotorom budet opisan adress
+                - $route = [] - budet sootvetstvovatj zajavlennomu url adresu, dolzhen bitj massivom poskoljku v njom ukazivajetsja kontroller i ekshn sootvetsvujushij dannomu marshrutu
+                - metod budet prostoj, prosto budem zapolnjatj vot etot massiv $routes, v kachestve kljucha budet parametr $regexp, i vtoroj parametr $route:
+                    - self::$routes[$regexp] = $route //
+
+    8. Udaljajem sozdannij objekt v index.php $router = new Router. On ne nuzhen boljshe.
+    9. Sozdajom pervoje pravilo:
+        - Router::add($regexp, $route)
+            - dlja proverki ne budem ispoljzovatj $regexp, a zasunem 'posts/add'
+            - $route -> ['controller' => 'posts', 'action' => 'add']
+
+    10. Teperj nuzhno kakto obrabativatj to chto poljzovatelj prishljot. Dlja etovo sozdajom jeshjo odin metod v klase Router:
+        - public static function matchRoute($url) // v kacheste parametra tot samij zapros s url, tak i obzivajem peremennuju
+        - perebirajem v cikle foreach nashe svojstvo routes, vesj massiv, i poluchajem iz nejo otdeljno reguljarnoje virazhenije i otdeljno marshrut kotorij sootvetsvujet etomu reguljarnomu virazheniju:
+            - foreach(self::$routes as $pattern => $route){}
+        - delajem prostuju proverku, sravnim pattern s url, jesli $url ravnjajetsja $pattern, togda zapolnim tekushij marshrut budet raven $route s cikla foreach:
+            - if($url = $pattern){
+                    self::$route = $route
+                    return true
+            }
+
+
+            ============================================================================================================
+
+
+            Napisali klass Router, sejchas budem pisatj logiku, dobavljatj marshruti, iskatj sovpadenije s nashim url adresom
+
+
+    11. Na dannom etape u nas pravila propisani hardkodom, chto ne dopustimo. Budem propisivatj po minimumu pravil, vo pervih
+        neobhodimo pervoje defoltnoje pravilo, po umolchaniju, kotoroje budet vesti na indexnuju stranicu, kotoroje pravolidirujet pustuju stroku
+            - dobavljajem nekoje pravilo po umolchaniju, tak kak mashrutizator dolzhen bitj gibkim, to ne obojtisj bez reguljarnih virazhenij:
+                - Router::add($regexp, $route) - vmesto $regexp -> '^$' (^ <- nachalo stroki, $ <- konec stroki, mezhdu nimi nichego net, sootvetsvenno pustaja stroka)
+                    - Router::add('^$', ['controller' => 'Main', 'action' => 'index'])
+                    //// Eto pervoje defoltnoje pravilo
+                - Router::add('(?P<controller>[a-z-]+)/?(?P<action>[a-z-]+)?'); <- pervij[a-z-]+ otvechajet za kontroller, vtoroj za action, znak + v konce otvechajet za odin ili boleje simvolov
+            - ih neobhodimo zapomnitj, poskoljku v budushem mi sobirajemsja ih hranitj v svojstve $route = []. v kotorom budet kontroller, action, i parametr jeslji budet prisutstvovatj
+
+    12. Funkciju matchRoute() izmenjajem, imenno proverku if, na dannom etape mi sravnivajem to chto hranitsja v $patterne s tem chto prishlo nam v $url. Dolzhno bitj reguljarnoje virazhenije:
+        - ispoljzujem funkciju preg_match(), pervim parametrom idjot $pattern, vtorim parametrom $url, nu i poskoljku mi hotim zapominatj kontrolleri eksheni i vsevozmozhnije parametri, ispoljzujem tretij parametr $matches:
+            - if(preg_match("#$pattern#i", $url, $matches)) <- "#$pattern#i" - ogranechiteli shablona i modifikator >i< sdelajet jevo registro nezavisimim
+
+    13. Daljshe mi nashli sovpadenije s kontrollerom i actionom, v etom sluchaje nam nuzhno sozdatj objekt najdennovo kontrollera, jesli jestj, i sootvetstvenno vizvatj jevo metod, jesli takzhe jestj.
+        - delatj vsjo eto v metode matchRoute ne ochenj horosho, tak kak on otvechajet toljko za sovpodenija
+        -  sozdajom staticheskuju funkciju dispatch() kotorij prinimajet parametr $url
+            - public static function dispatch($url){}
+            - i zdesj etot metod uzhe vizivajet u nas matchRoute, kotorij vozvrashjajet libo true, libo false
+                - if(self::matchRoute($url)){echo 'OK'}else{http_response_code(404); include '404.html';}
+
+    14. V self::$route v metode matchRoute(), nam neobhodimo polozhitj tuda kontroller i action.
+        - projdjomsja v cikle mo massivu $matches i vozjmjom znachenije toljko teh kljuchej kotorije javljajutsja strokami.
+            - foreach ($matches as $k => $v) <- $matches massiv, $k kljuch, $v value
+                - v njom proverjajem jeslji $k stroka, metodom is_string, to v $route[$k] = $v
+                    - if(is_string($k){$route[$k] = $v}
+        - jesli net actiona v url, toljko kontroller, to po umolchaniju prisvajevajetsja index. Eto propisivajem v matchRoute:
+            - jesli ne javlajetsj (!isset()) $route action, to prisvajevajem $route['action'] = 'index'
+                - if(!isset($route['action'])){$route['action'] = 'index'}
+
+    15. v metode dispatch, v proverke selff::matchRoute($url), sozdajom peremennuju $controller:
+        - $controller = self::route['controller']
+        - daleje proverjajem jesli u nas jestj takoj klass cherez class_exist($controller), togda mi dolzhni jevo podkljuchitj
+            - if(class_exist($controller)){echo 'ok';}
+        - v protivnom sluchaje vivodim kontroller ne najden
+            else{echo "Kontroller <b>$controller</b> ne najden"}
+
+    16. Sozdajom v papke controllers dva kontrollera Main i Posts, i podkljuchajem v indexnom fajle pokachto cherez require
+
+    17. Sozdajom funkciju protected static s parametrami $name, nekoje imja klasa, stroku, nevazhno chto
+        - protected static function upperCamelCase($name)
+        - propisivajem peremennoj vstrojennuju php funkciju ucwords
+            - $name = ucwords($name)
+        - uberajem defis s pomoshju str_replace()
+            - $name = str_replace('-', ' ', $name)
+        - uberajem probel tojzhe funkcijej
+            - $name = str_replase(' ', '', $name)
+        - delajem refaktoring koda, i zapisivajem vsjo v odnu stroku:
+            - return str_replace(' ', '', (ucwords(str_replace('-', ' ', $name))));
+
+            // Vsjo eto delajem dlja sistemi windows, potomu chto windows registro nezivisima sistema
+
+    18. daleje deljajem refaktoring koda v metode dispatch:
+        - $controller = self::upperCamelCase(self::$route['controller']);
+
+    19. tak kak klass najden, on jestj, poetomu sozdajom objekt dannovo klasa v metode dispatch(), v usloviji if(class_exist):
+        - nazivajem jevo k primeru $cObj (controllerObject), i prisvajevajem new Controller:
+            - $cObj = new $controller;
+            - dlja proverki vsjo li rabotajet, v klase PostNew, sozdajom __constuct() i vivedem chtoto na ekran:
+                - public function __construct(){echo 'PostNew::__construct'}
+
+    20. Teperj neobhodimo vizvatj sootvetstvujushij metod dannovo kontrollera:
+        - v tomzhe dispatch() gdje sozdovali $cObj, sozdajom peremennuju $action, poluchim iz self::route['action'] massiva, neobhodimoje nam znachenije:
+            - $action = self::$route['action'];
+        - i proverjajem sushestvujet li takoj metod u klassa s pomoshju method_exist($cObj, $action) <- u klasa $cObj, metod -> $action, togda jevo i zapustim:
+            - if(method_exist($cObj, $action)){$cObj->$action()}else{echo "Metod <b>$controller::$action</b> ne najden"}
+        - chtobi proveritj zarabotalo li, to v Posts kontrollere sozdajom action index
+
+    21. Sozdajom funkciju loverCamelCase():
+        - protected static function lowerCamelCase($name)
+              {
+                  return lcfirst(self::upperCamelCase($name));
+              }
+        - menjajem $action:
+            - $action = self::lowerCamelCase(self::$route['action']);
+
+            // Dlja tovo chtobi na linukse vsjo rabotalo.
+
+    22. Dlja tovo chtobi poljzovatelj ne mog vizvatj nekotorije metodi, neobjazateljno propisivatj ih kak protected, sozdajom prostuju puublichnuju funkciju k primeru before, v kontrollere:
+        - public function before(){echo "Posts::before"}
+        - dlja etovo kazhdomu metodu dobavljajem postfiks Action, no tot kotorij ne hotim chtobi bil vizvan, ne dobovljajem
+        - takzhe konkatinirujem $action s 'Action' v metode dispatch():
+            - $action = self::lowerCamelCase(self::$route['action']) . 'Action';
+
+    23. Sozdadim funkciju avtozagruzki:
+        - takzhe zavodim konstanti:
+                - define('WWW', __DIR__) <- path tekushej papki, tekushaja papka public, tam gde nahoditsja fajl otkuda vizivajem __DIR__
+                - define('CORE', dirname(__DIR__) . '/vendor/core') <- zahodit v papku vendor/core
+                - define('ROOT', dirname(__DIR__)) <- vesti ona budet v korenj projekta, dirname(__DIR__) vihodit iz papki public v korenj
+                - define('APP', dirname(__DIR__) . '/app') <- vihodit iz papki public, i zahodit v papku app
+        - Dlja etovo v index.php sozdadim funkciju spl_autoload_register(function(){});
+            - spl_autoload_register(function($class){
+                $file = APP . "/controllers/$class.php"
+            })
+        - daleje proverjajem jesli u nas jestj takoj fajl, to podkljuchajem chere require_once;
+            if(is_file($file)){reqire_once $file}
+
+
+            ==========================================================================================================================
+
+            Na dannom etape u nas napisan klass Router, i funkcija avtozagruzki. No jestj neboljshaja problema, funkcija
+            avtozagruzki, ne sovsjem universaljna, poskoljku zagruzhajem klassi zhostko iz papki app/controllers.
+            Budem modificirovatj funkciju avtozagruzki.
+
+    23. S pomoshju namespace, budem podgruzhatj vsje nuzhnije fajli. Namespace eto putj k klasu, nachinaja ot kornja nashevo prelozhenija.
+        V klasse Router propisivajem namespace s papkami do nashevo klasa:
+            - namespace vendor\core; <- s obratnim sleshom. Tak kak klass Router nahoditsja v papke core, to putj budet vendor/core/Router
+            - ostalosj toljko dobavitj v konce .php
+            - v index.php menjajem fukciju sp_autoload_register(), pishem korektnij putj:
+                - $file = ROOT . '/' . str_replace('\\', '/', $class) . '.php';
+                  // zamenjajem obratnij slesh na prjamoj slesh, v imni klassa, i dobovljajem rashirenije .php
+            - vezde takzhe gdje ispoljzujem klass router propisivajem namespace v index.php.
+                - vendor\core\Router::
+            - chtobi ne ispoljzovatj vsjo vremja boljshoj putj vendor\core\Router, naverhu v index.php fajle propisivajem:
+                - use vendor\core\Router
+
+    24. Chtobi vivodilisj oshibki, tipo net takoj peremennoj, itd, ljubovo roda oshibok, kotorije ne pokazivajutsja pri zagruzke stranici,
+        no nam neobhodimo ih videt/znatj, propisivajem v index.php fajle.:
+            - ini_set('display_errors', 1);
+              ini_set('display_startup_errors', 1);
+              error_reporting(E_ALL);
+
+    25. Teperj u nas Router podkljuchjon praviljno, avtozagruzkoj, no teperj jestj problema s klasami kontrollerov, teperj oni ne najdeni,
+        tak kak ranneje mi ih podkljuchali iz papki app/controllers.
+        - Modificirujem dispatch() peremmunuju $controllers. Konkatenirujem 'app\controllers\\'
+        - takzhe propisivajem namespace v kontrollerah.
+
+    26. Vot i dohli do ponjatija vidov. Mi napisali logiku dlja otobrazhenija, controllerov, actionov, i mi mozhem v metodah pisatj kakujuto
+        logiku, rabota s bazoj dannih i tak dalee, no sejchas nam nado vsjo eto vivesti na ekran, pokazatj poljzovatelju.
+        Sejchas nam nuzhno podkljuchitj kakto shablon, i podkljuchitj vid. Pokachto podkljuchim toljko vid.
+            - Shablon eto nekaja povtorjajushjaj chastj kazhdoj stranici, naprimer teg head, podkljuchenije stilej, skriptov
+            - vid eto kontent, kotorij menjajetsja na sajte.
+        - Postorajemsja sdelatj sistemu nashih shablonov i vidov ochenj gibkoj, chtobi ne napregatj poljzovatelja, izbavitj jego ot
+          podkljuchenija vidov na kazhdoj stranici. Budem podkljuchatj vid i shablon po defoltu, pri etom vsjo budet dostatochno gibko,
+          i pozvolim poljzovatelju menjatj vid na tot kotorij on sam zahochet.
+        - neobhodimo produmatj, kak budem hranitj vidi, dlja etovo v papke app jestj papka views, gdje dolzhni hranitsja vidi, no svalivatj
+          ih v odnu kuchu, bilobi ne ochenj horosho
+        - pod kazhdij kontroller v papke views sozdajotsja svoja podpapka, Jeslji v papke controllers jestj tri klassa - Main, Posts, PostNew,
+          sootvetsvenno v papke views budem sozdvatj tri papki s takimizhe nazvanijami
+        - Vsje vidi kazhdovo kontrollera, budut hranitsja v svojej papke.
+        - Nazivatsja vidi budut po imeni actiona, tojestj v papke Posts budut nahoditsja tri vida, kotorije propisani v klasse Posts index, test, testPage:
+           - sozdajom index.php, test.php, testPage.php
+        - Kak uznatj chto po urlu naprimer posts/test neobhodimo zvjatj imenno vid test:
+            - vsje eti znanija nahodjatsja v peremennoj $route;
+            - vsjo chto nuzhno sdelatj eto peredatj etu infu v nash kontroller:
+                - v dispatch() sozdavali objekt kontrollera, i na etom zhe etape mozhem peredatj v etot objekt kakijeto parametri:
+                    - $coBj = new $controller(self::$route);
+                - sootvetstvenno nam potrebujetsja nekoje svojstvo v kontrollere Posts:
+                    - public $route = []
+                    - public function __contruct($route){$this->route = $route} // sozdajom publichnij metod konctruktor, kotorij budet bratj eto svojstvo, i zapolnjatj jevo tem chto prihodit v nash konstruktor parametrom pri sozdaniji objekta
+                - chtobi ne dublirovatj kazhdij raz etot kod, neobhodimo sozdatj bazovij klas kontrollera, kotorij budet nahoditsja ne v prelozheniji a v jadre(core)
+                    - sozdajom v core papku base, i v nej budet nahoditsja bazovij klass kontrollera, vidov itd, kotorim mi budem nasledovatj vsjemi kontrollerami nashevo prelozhenija
+                    - sozdajom v base papke novij class Controller, srazu s prostranstvom imjon;
+                        - etot klass budet abstraktnim, i napisanij kod s konstruktorom iz Posts clasa, perenosim v etot sozdannij klass.
+                    - ostalosj nasledovatsja ot klasa Controllers:
+                       - class Posts extands Controller
+
+    27. Sozdadim novij controller Page, dlja budushej raboti, razshirjajemim bazovim klasom kontrollera
+        - class Page extends Controller
+        - propisivajem odin action viewAction
+
+    28. Sejchas u nas odin action otvechajet za odnu stranicu, eto ne ochenj udobno.
+
+    29. Izmenjajem Samoje glavnoje pravilo:
+        - Router::add('^page/(?P<action>[a-z-]+)/(?P<alias>[a-z-]+)$', ['controller' => 'Page']); // dobavili alias, i tem samim mozhem obratitsja naprimer k page/view/about
+
+    30. Chtobi izbavitsja ot view v url stroke page/view/about dobavljajem jeshjo odno pravilo:
+        - Router::add('^page/(?P<alias>[a-z-]+)$', ['controller' => 'Page', 'action' => 'view']);
+
+    31. Dobavljajem paginaciju na stranicu, chtobi sotni statej ne vivodilisj na sajt, kak primer.
+        - dlja etovo neobhodimo iz url otsechj vsje javnije GET parametri, naprimer:
+            - post-new/test/?page=2&var1=1&var2=2 <- post-new/test/ <- nejavnije parametri, vsjo ostaljnoje javnije GET parametri.
+
+        - sozdajom funkciju protected static removeQueryString(){$url} v Router.php, kotorij prinimajet $url adres.
+        - etot metod budem ispoljzovatj v metode dispatch:
+            - $url = self::removeQueryString($url);
+        - daleje dajom uzlovije jesli straka true, to toljko togda chtoto delajem, jeslji false to nichevo:
+            - if($url){}
+            - sozdajom peremennuju $params, v kotoruju slozhem v kachestve massiva stroku razbituju po ampersantu '&' nashu peremennu $url
+                - if($url){$params = explode('&', $url)}
+            - zadajom nuzhnoje nam uslovije, jesli false === strpos($params[0], '='){}, to vozvrashajem $params[0], i obrezajem koljcevoj slesh:
+                if(false === strpos($params[0], '=')){return rtrim($params[0], '/')}
+            - else jesli vernjot true, to return pustuju stroku:
+                - else{return '';}
+
+       ===============================================================================================================================
+
+       Podkljuchajem uzhe shabloni i vidi po krasote.
+
+    32. Potrenujetsja bazovij class vida, v papke base. Sozdajom
+        - Potrebujutsja tri svojstva
+            1. route, v njom budet soderzhatsja tekushij marshrut, chtobi vzjatj iz nevo kontroller, i znachenije actiona, poskoljku eto te veshi kotorije nam ukazivajut gdje hranitsja vid
+            2. View svojstvo
+            3. Layout svojstvo
+        - v klase view sozdajom tri svojstva:
+            - public $route = []; public $view; public $layout;
+        - Potrebujutsja kak minimum dva metoda, eto metod:
+            - konstruktora, kogda mi budem sozdavatj objekt klasa view, to sootvetstvenno mi budem zapolnjatj vsje sozdannije svojstva
+              Tojestj budem bratj tekushij marshrut i pomeshjatj jevo v massiv $route, i takzhe mi budem zapolnjatj svojstva $view i $layout,
+              tekushimi znachenijami vida i shablona, shablon mi budem bratj po umolchaniju, jeslji jevo ne opredelil poljzovatelj,
+              i vid sootvetstvenno budem bratj iz $route action, jeslji jevo takzhe ne pereopredelil poljzovatelj
+            - metod render, mi jevo budem vizivatj avtomatom, tojestj ne budem doverjatj eto vsjo poljzovatelju, i v njom imenno budem podkljuchatj vid,
+              podkljuchatj shablon, i opredeljatj peremennije, delatj ih dostupnije dlja vida i shablona, kotorije poljzovatelj peredajot
+              iz kontrollera
+
+    33. Sozdajom public function __construkt, kotorij prinimajet v sebja route, vid i shablon kak pustije stroki
+        - public function __construct($route, $layoute = '', $view = ''){}
+        - zapolnjajem $this->route = $route;
+        - daleje v index.php zavodim konstantu dlja nashevo shablona, kotorij mi chutj pozzhe sozdadim:
+            - define ('LAYOUT', 'default');
+        - v __construktore propisivajem, jesli $layout bil peredan, to ispoljzujem jevo, jesli net, to ispoljzujem defaultnij:
+            $this->layout = $layout ?: LAYOUT
+        - daleje opredeljajem view, takzhe kak route:
+            - $this->view = $view;
+
+    34. Sozdajom metod render:
+        - sozdajom publichnuju funkciju render(), prinimajet odin parametr, no pokachto obojdjomsja bez nevo.
+          Parametr budet ni chto inoje kak peremennaja kotoraja peredajot poljzovotelja iz kontrollera v vidi, i shablon
+        - podkljuchajem vid i shablon:
+            - sozdajom peremennuju file_view, v kotoruju pomestim putj k nashemu vidu
+                - $file_view = APP . "/views/{$this->route['controller']}/{$this->view}.php"
+        - daleje proverjajem jeslji sushestvujet takoj fajl $file_view, togda mi jevo podkljuchim cherez require $file_view:
+            - if(is_file($file_view)){ requier $file_view}
+            - v protivnom sluchaje vivodim soobshenije vid ne najden
+        - smotrim chto poluchitsja na dannom etape:
+            - nam neobhodimo v kontrollere sozdatj objekt vida, i vizvatj jevo metod render.
+        - dlja nachala zapolnim svojstvo $view v Controller.php :
+            - $this->view = $route['action']
+        - a teperj sozdadim metod getView(), sozdadim $vObj (objekt vida) new View($route):
+            - $vObj = new View($this->route, $this->layout, $this->view)
+        - sozdali objekt vida, i ostajotsja nam toljko u dannovo objekta $vObj vizvatj etot render:
+            $vObj->render();
+        - daleje vizivajem etot metod getView v dispatche:
+            - $cobj->getView()
+        - Ne zabivajem nasledovatj controlleri cherez extends Controller, no jeshjo luchse sozdatj kontroller App v papke app/controllers
+          i nasledovatj jevo ot Controllera iz jadra, i vsje ostoljnije kontrolleri nasledovatj ot App.
+          Tem samim chtobi ne lestj v cotroller jadra(core), budem pisatj logiku v kontrollere App
+
+    35. Na dannom etape u nas vivoditsja srazu vid na ekran poljzovatelju, no pervim dolzhen vivoditsja shablon, i potom v opredeljonnom meste vid.
+        Chtobi eto realizovatj nam nado pozabotitsja chtobi vid u nas ne podkljuchalsja ranjshe shablona, i temboleje chtobi ne vivodilsja, do teh por poka mi etovo ne zahotim
+        - tut nam prigoditsja buferizacija. Funkcij ob_start(), posle nejo vsjo buferizirujetsja.
+            - podkljuchajem jejo v metode render, pered ciklom
+        - posle proverki sozdajom peremennuju $content i skladivajem v nejo vsjo chto nahoditsja v bufere obmena, funkcija ob_get_clean()
+            - $content = ob_get_clean() // funkcija ochishajet bufer obmena, i skladivajet vsjo v peremennuju $content
+        - teperj mozhem podkljuchatj nash shablon, a uzhe v shablone vizivatj etu peremennuju s buferom, v nuzhnom meste.
+
+    36. Prishlo vremja dlja nashevo shablona
+        - sozdajom peremennuju naprimer $file_layotu s putjom do shablona:
+            - $file_layout - APP . "/views/layouts/{$this->layout}.php"
+        - daljshe proverka, jesli sushestvujet takoj fajl, togda mi jevo podkljuchajem cherez require, v protivnom sluchaje v protivnom sluchaje vivodim soobshenije vid ne najden
+        - v papke views sozdajom novuju papku, nazivajem jejo layouts, i vnej shablon po umolchaniju, kotorij mi nazvali default.php
+        - daleje skachivajem bootstrap, raspakovivajem, tam tri papki css, fonts, js. Vsju etu papku zakidivajem v papku public.
+        - v defoult.php sootvetstvenno kopirujem razmetku bazovuju ot bootstrap, i probujem vivesti nash vid kotorij v bufere nahoditsja:
+            - <?= $content ?>
+
+    37. Obratim vnimanije chto v Main controllere, mi nikak ne podkljuchajem ni shablon, ni vid, vsjo eto podkljuchajetsja po umolchaniju.
+        Shablon po umolchaniju, kotorij mi mozhem pomenjtaj pokachto v index.php fajle konstantu define('LAYOUT', 'default').
+
+        K primeru mi hotim pomenjatj shablon dlja dannovo voobshje klassa Main.php, dlja vsjeh teh stranic kotorije budut opisani v klase Main,
+        a dlja vsjeh ostoljnih hotim sdelatj shablon po umolchaniju, libozhe voobshje hotim pomenjatj shablon dlja dannovo action, a dlja
+        vsjeh ostaljnih ispoljzovatj shablon po umolchaniju. I takzhe hotim pereopredelitj dlja dannovo actiona vid po umolchaniju.
+
+        Sejchas ispoljzujetsja vid kotorij ishetsja v papke views/Main, i tam vot index.
+
+        V Controller kakraz sushestvujet svojstvo public $view i public $layout, i teoreticheski mi ih mozhem v Main clase pereopredelitj.
+        - V indexAction v Main kontrollere propisivajem:
+            - $this->layout = 'main'; // Dlja etoj stranici ja hochu ispoljzovatj shablon main
+              $this->view = 'test';   // Dlja etoj stranici ja hochu ispoljzovatj vid test
+            - shablon i vid mi uspeshno pereopredelili na urovne actiona
+            - teperj poprobujem sdelatj tozhe samoje, toljko s shablonom, pereopredelim na urovne klassa:
+                - v Main klase, propisivajem public $layout = 'main'; <- etim mi zagruzim odin shablon dlja vsjeh actionov.
+            - chtobi ubeditsja chto vsjo rabotajet, sozdadim dlja proverki view test v Main papke, i shablon main v layout papke.
+              Iz default shablona vozjmjom vsju razmetku, i vstavim v main shablon.
+              Shablon main podkljuchilsja uspeshno, i v nego podkljuchilsja vid test
+
+    36. Sdelajem jeshjo - dadim vozmozhnostj poljzovatelju ne podkljuchatj shablon, eto nuzhno togda kogda naprimer otpravljajem
+        AJAX zapros, i nuzhni toljko dannije, bez neobhodimosti podkljuchenija shablona. Nuzhno zapretitj podkljuchatsja shablonu, i v etom sluchaje
+        ne budet podkljuchatsja vid, poskoljku on podkljuchajetsja imenno v shablone
+        - Jeslji ja ne xochu chtobi podkljuchalsja imenno dlja dannovo actiona shablon, to vo app kotrollere, k primeru Main, v indexAction propisivajem:
+            - $this $layout = false; // tem samim govorju, ne podkljuchaj shablon dlja dannovo actiona, chtobi prosto uvidetj na ekrane nekije dannije.
+        - chtobi dannaja konstrukcija zarabotala, to v View.php v constructore dobamivim uslovije posle  $this->route = $route:
+            - jeslji $layout budet strogo rovna false, togda $this->layotu takzhe prisvajivajem false
+                - if($layout === false ){$this->layout = false;}
+            - v protivnom sluchaje naznachim shablon po umolchaniju:
+                - v else {} vstavljajem $this->layout = $layout ?: LAYOUT:
+                    - else{$this->layout = $layout ?: LAYOUT;}
+        - a kogda renderim vsjo eto delo, dobavim tozhe uslovije posle $content = ob_get_clean():
+            - jeslji false === $this=layout togda vstavljajem vesj kod kotorij nahoditsja nizhe, v protivnom sluchaje nichevo podkljuchatsja ne budet
+
+    37. Na dannom etape u nas vsjo dostatochno gibko. Tojestj jeslji mi ne hotim podkljuchatj nikakoj shablon, a toljko vivesti dannije, to
+        ostavljajem $this->layout = false <- otkritoj. No jeslji mi hotim podkljuchitj svoj vid, to layout = false komentirujem, tojestj zakrivajem,
+        no $this->layout = 'test' <- otkrivajem, kak primer 'test'
+        No jeslji mi ne pereopredeljajem, to podkljuchajetsja defoltnij shablon. Jeslji voobshje nigdje ne pereopredeljajem
+
+    38. Peredacha peremennih vnutrj vida. Vo freimvorkah eto delajetsja sledujushim obrazom:
+        - sushestvujet nekij metod, kotorij sobstvenno i obespechivajet peredachu vidu. Sejchas jesli mi napishum nekuju peremennuju v action kontrollera naprimer Main,
+          $name = 'Artur', jesli mi popitajemsja jejo vivesti v nashem vide, a eto na dannij moment index, to mi poluchim soobshenije o tom
+          chto takaja peremennaja ne sushestvujet.
+        - Peredajom jejo v nash vid. Dlja etovo napishem specialjnij metod v kontrollere vendor/core/base/Controller.php:
+            - public function set($vars) <- prinimajet nekije parametri, dopustim $vars.
+            - takzhe opredeljajem svojstvo kontrollera kak massiv -> public $vars = [], v tomzhe fajle, posle public $layout;
+            - metod set() budet zapolnjatj svojstvo, svojstvo vars peredannimi poljzovateljskimi dannami:
+                - $this->vars = $vars;
+            - daleje modificirujem $vObj->render():
+                - $vObj->render($this->vars);
+            - i v metode render() v View.php etot samij $vars mi dolhzni prinjatj
+            - Sejchas peredajom v tom samom controllere gdje nahoditsja peremennaja propisivajem:
+                - $this->set(), i peredajom dannije v vide massiva, mi ozhidajem chto eto budet massiv
+                - $this->set(['name' => $name, 'hi' => 'hello']);
+            - Oni dostupni v metode render, i nam ostalosj ih sdelatj dostupnim dlja vida i shablona. Sdelatj eto mozhno dostatochno legko,
+              ispoljzovav funkciju extract(), v render(), kotoraja izvlekajet elementi massiva, i sozdajot dlja nih odnoimennije peremennije,
+              tojestj jesli u nas bil element 'name', to budet sozdana peremennaja $name
+            - mozhem peredavatj dazhe massivi.
+            - Dlja udobstva oboznachajem peremennije snachalo, k primeru vitashili kakojeto znachenije iz bazi dannih iz zasunuli v peremennuju,
+              takzhe sozdajom massivi, ih tozhe mozhno peredatj. I peredajom vsjo fukcijej compact(), ne zabivajem chto peredajom ne peremennije, a imja peremennoj:
+                - $this->set(compact('name', 'hi', 'colors')) < sami peremennije vigljadjat tak ($name, $hi, $colors), a colors eto massiv
+                    - chtobi vitashitj znacenije massiva -> $colors['description'] <- sam masiv vigljadit $colors=['description'=>'some descr', 'color' => 'white']
+       ===============================================================================================================================
+
+       Modelj i rabota s bazoj dannih chastj 1
+
+    39. Imenovanija, na dannom etape u nas kontrolleri imenujutsja ochenj prost, naprimer App, Main, Page itd. V papke models pojavjatsja modeli
+        kotorije budut imenovatsja tozhno takzhe, Page, Main itd. I nam nado kakto ih otlichatj drug ot druga. Ponjatno chto prilozhenije ih budet otlichatj,
+        poskoljku mi ispoljzujem prostranstvo imjon, i pri podkljucheniji fajlov ispoljzujetsja imenno prostranstvo imjon.
+        No v samom kode, mi ne budem znatj chto eto takoje kontroller Page ili modelj Page naprimer. I chtobi otlichatj drug ot druga na urovne imenno koda,
+        prinjato dobavljatj kakojto postfix. Poetomu dobavljajem postfix Controller imenno kontrolleram.
+        - Daleje pereimenovivajem sam fajl, sam kontroller naprimer bil Page, posle pereimenovanija PageController.
+        - daleje v Router gdje objavljajem peremennuju $controller v dispatch() dobovljajem postfix 'Controller' konkatenacijej
+            - $controller ='app\controllers\\' .  self::$route['controller'] . 'Controller';
+
+    40. Poskoljku budem rabotatj s bazoj dannih, poetomu sozdajom bazu dannih naprimer fw, sokrashenije ot framework
+
+    41. Takzhe nam potrebujetsja gdjeto hranitj nastrojki k podkljucheniju k BD.
+        - budem ispoljzovatj PDO
+        - nastrojek budet neskoljko, v chastnosti eto budet nastrojka podkljuchenija k baze dannih,
+          nastrojki nashevo prilozhenija, mi ih mozhem konechno hranitj v odnom fajle, no prinjato ih raznositj o raznim fajlam.
+
+    42. Na urovne app, public, vendor sozdajom otdeljnuju papku nazivajem config, i v nej sozdajom config_db.php
+        - v nej budet hranitsja nastrojki sojedinenija servera s bazoj dannih, obichnij massiv kotorij budem vozvrashjatj:
+            - return [];
+        - poskoljku ispoljzujem PDO, poetomu zapisivajem nastrojki v neobhodimom formate:
+            -
+                return [
+                    'dsn' => 'mysql:host=localhost;dbname=fw;charset=utf8',
+                    'user' => 'root',
+                    'pass' => ''
+                ];
+                // vot i vsje nastrojki sojedinenija s bazoj dannih
+        - daleje sozdajom neskoljko fajlov dopolniteljnih kotorije budem dopolnjatj kodom:
+            - pervij fajl eto class Db, kotorij sozdajom v jadre vendor/core
+            - vtoroj fajl eto bazovij klas modeli, nazivajem prosto Model, i sozdajom v papke base vendor/core/base
+            - tretij fajl v app/models, eto budet pervaja nasha modelj, kotoraja budet sovpadatj s imenem kontrollera
+                - sozdajom model Main
+
+    43. Napolnjajem eti klasi sozdanije soderzhimim:
+        - class Db, ne dajot sozdatj boleje chem odin objekt, sozdajotsja zasheshjonoje nekotoroje svojstvo, i sozdajotsja zashishjonnij __construct()
+          chtobi ne vozmozhno bilo sozdatj objekt dannovo klassa, i daleje sozdajotsja nekij publichnij staticheskij metod, kotorij budet
+          proverjatj, sozdan li objekt dannovo klassa ili net, jeslji ne sozdan, togda on jevo budet sozdavatj, i vozvrashjatj.
+          Jesli sozdan to srazu jevo vernjot
+        - mi ne mozhem sozdatj objekt dannovo klassa, mi mozhem obratitsja k metodu staticheskomu, kotorij vernjot nam objekt klassa, opjatj zhe jeslji on sozdan,
+          to srazu zhe vernjot, jesli net, to sozdast, tem samim mi poluchim dlja vsjego prilozhenije toljko odin objekt dannovo klassa
+        - zdesj v class Db, budet realizovanno imenno podkljuchenije k baze dannih, i pljus dobavim jeshjo sjuda parochku nizkourovnevih metodov,
+          dlja raboti s bazoj dannih, pervij budet prosto vipolnjatj zapros, a vtoroj budet jeshjo i vozvrashjatj dannije
+
+    44. Sozdajom v class DB{} dva svojstva, odno zashishjonoje, vtoroje zashishjonoje staticheskoje
+        - protected $pdo;
+          protected static $instance
+        - daljej sozdajom protected __construct(), nikakih parametrov on prinimatj ne budet.
+        - i sobstvenno v __construct neobhodimo poluchitj podkljuchenije k bd, i zapisatj svojstvo $pdo:
+            - vsje nastrojki hranjatsja v fajle config_db.php, poetomu podkljuchajem v __construct()
+                - $db = require ROOT . '/config/config_db.php'
+        - poskoljku fajl sostojit iz massiva, poetomu $db, budet iz sebja predstovljatj massiv, s kljuchom i znachenijem
+        - daleje propisivajem tamzhe:
+            - $this $pdo = new \PDO($db['dsn'], $db['user'], $db['pass'])
+        - teperj u nas v svojstve pdo budet objekt ili ukazatelj na otkritoje podkljuchenije k serveru bazi dannih, kotoroje nam neobhodimo kakto vozvrashajatj.
+        - Dlja etovo pishem publichnij staticheskij metod, nazovjom tozhe instance, tak prinjato nazivatj, i prosto proverim:
+            - jeslji u nas self::$instance ravnjajetsja strogo null, togda v self::$instance zapishem objekt dannovo klasa new self:
+                - if(self::$instance === null ){self::$instance = new self}return self::$instance
+        - Teperj pri obrasheniji k publichnomu statichnomu metodu instance, budet proverjatsja , jeslji v objekte nichevo net, togda mi sozdadim objekt dannovo klassa.
+
+    45. Daleje nam potrebujetsja dva metoda, nizkourovnevije, tojestj oni budut prosto v daljnejshem ispoljzovatsja nashej modelju, dlja vipolnenija zaprosov
+        - pervij metod nazovjem execute($sql), parametrom budet prinimatj $sql. Metod budet dlja nachala podgotavlivatj
+            - $stmt = $this->pdo->prepare($sql)
+            - return $stmt->execute() // vozvrashjajem sozdannij metod
+            // Dannij metod budet vipolnjatsja dlja teh sluchajev kogda nam nado prosto vipolnitj sql zapros, i dannije iz bazi pri etom nam ne nuzhni
+        - Vtoroj metod pishem metod query, kotorij tozhe budet prinimatj $sql zapros
+            - public function query($sql) <- on tozhe budet jevo gotovitj vipolnjatj, no jeshjo i vozvrashjatj dannije, etot metod neobhodim dlja
+              zaprosov tipo SELECT, kotori osushestvljajet viborku dannih iz bazi:
+                - $stmt = $this->pdo->prepare($sql); <- gotovim sql zapros
+                  $res =  $stmt->execute(); <- vozvrashjajem v peremennuju $res
+            - delajem proverku chto u nas nahoditsja v peremennoj $res:
+                - jesli v $res !== false, znachit tam jestj kakijeto dannije, i sootvetstvenno mi ih dolzhni vernutj:
+                    - return $stmt->fetchAll();
+                - jeslji false, znachit kakajato oshibka, i nichevo ne vernjot, dlja etovo vozvrashjajem prosto pustoj massiv:
+                    - return [];
+        - Na etom nash class Db gotov.
+
+    46. Sejchas mozhem pisatj class Model, i sootvetstvenno pitatsja chtoto testirovatj.
+        - dlja modeli nam potrebujetsja tozhe samoje svojstvo v kotorm mi budet hranitj podkljuchenije:
+            - protected $pdo
+        - i potrebujetsja jeshjo svojstvo kotoroje nazovjom $table, v kotorj budet hranitsja imja tablici, s kotoroj budet rabotatj ta ili inaja modelj.
+        - daleje nam potrebujetsja publichnij __construct(), bez parametrov:
+            - $this->pdo = Db::instance() <- budem prosto zapolnjatj svojstvo pdo, kotorje vernjot objekt podkljuchenija, teperj budet aktivnoje podkljuchenije k baze dannih
+        - Sejchas napishem parochku metodov:
+            - public function query($sql) <- etod metod budet ne chem inim kak objortkoj nad metodot execute klasa Db
+                - return $this->pdo->execute()
+                    // Dannij metod neobhodim chtobi vipolnitj opjatj taki sql zapros, i vernutj libo true, libo false
+            - public function findAll(), kotorij vozvrashjajet vsje dannije iz nekoj tablici, v dannom sluchaje s toj tablicoj, s kotorj rabotajet modelj.
+                - pishem dlja nachala zapros $sql = "SELECT * FROM {$this->table}"
+                - i vipolnjajem jevo:
+                    - return $this->pdo->query($sql)
+        - Metodi gotovi i mozhno ih testirovatj.
+
+    47. Dlja etovo nam neobhodimo nasledovatj klass modeli:
+        - class Main extends Model{}
+        Neobhodimo opredelitj svojstvo tablici, tojestj ta tablica s kotoroj budet rabotatj dannaja modelj. v dannom sluchaje eto Main:
+            - public $table = 'posts'
+
+    48. Daleje testirujem.
+        - neobhodimo sozdatj objekt modeli Main, dlja tovo chtobi nam bili dostupni vsje jevo metodi:
+            - v MainControllele v actione sozdajom peremennuju $model, i zapihivajem v nejo new Main
+            - daleje propisivajem peremennuju i vizivajem v nejo metod findAll
+                - $posts = $model->findAl();
+        - nuzhno chtobi prihodil toljko assotiativnij massiv, sdelatj eto dostatochno prosto, obichno podajut v fetchAll() \PDO::FETCH_ASSOC, v klase Db.php
+          No jeslji u nas takih metodov budet mnogo, to mi vinuzhdeni budem vezde peredovatj etu samuju konstantu \PDO::FETCH_ASSOC,
+          no mi mozhem podatj jejo toljko odin raz, i sdelatj eto mozhem v moment sojedinenija.
+        - Pri sojedinenije mi mozhem peredatj mnozhestvo vsjakih raznih opcij
+            - budem ispoljzovatj dve poleznih konstanti. Pervaja budet otvechatj za format dannih po umolchaniju, tojestj hotim vsjegda videtj massivi,
+            - vtoraja budet otvechatj za oshibki, naprimer jeslji budet obrashjatsja k tablice kotorj ne sushestvujet, to poluchajem mi pustoj massiv,
+              i takoje vot otlazhivatj dovoljno slozhno
+        - Sozdajom konstantu, kotoraja otvechajet za pokaz oshibok v klase Db, v __construct()
+            - sformirujem massiv $options = []; i peredadim tuda dve konstanti:
+                - \PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+                - \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC <- po umolchaniju dlja vozvrashjajemih dannih, v kakom formate budem poluchatj dannije
+            - Peredajom $options chetvjortim parametrom:
+                - $this->pdo = new \PDO($db['dsn'], $db['user'], $db['pass'], $options);
+
+    49. Sejchas uzhe proshe, mi videm ne prosto pustoj massiv, no znajem chto naprimer takaja tablica ne sushestvujet, v sluchaje
+        jesli imja tablici ukazano ne praviljno.
+
+    50. Sejchas dannije u nas jestj, sejchas mi smelo mozhem peredavatj ih v vid, i v vide ih vivoditj.
+        - Peredajom v MainController v set parametron $posts, kotorije mi dostali iz bd:
+            - $this->set(compact('title', $posts));
+        - i v vide sootvetsvujushem vivodim:
+            - sozdajom konteiner, dlja bootstrap, i proverjajem jeslji u nas ne pust massiv posts, to ciklom vivodim k primeru name i descr,
+              tak oboznacheni polja v tablice, v nih dannije:
+                - <div class="container">
+                    <?php if(!empty($posts)) : ?>
+                        <?php foreach($posts as post) : ?>
+                            // Zapihivajem razmetku bootstrap dlja primernovo oformlenija
+                            <div class="row">
+                              <div class="col-sm-6">
+                                <div class="card">
+                                  <div class="card-body">
+                                    <h5 class="card-title"><?= $post['name']?>></h5>
+                                    <p class="card-text"><?= $post['descr']?>></p>
+                                  </div>
+                                </div>
+                              </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+
+    51. Vsje posti uspeshno vivedeni, pri etom v prelozheniji nam neobhodimo sozdatj modelj, v nej ukazatj svojstvo table:
+        - public $table = 'nazvanije tablici', s kotoroj budet rabotatj nasha modelj
+        - daleje v kontrollere neobhodimo sozdatj objekt nuzhnoj nam modeli:
+            - $model = new Main;
+        - i vizvatj metod findAll();
+            - $posts = $model->FindAll()
+        - daleje peradjom $posts v $this->set(compact('posts'))
+        - dannije poluchajutsja, oni peredajutsja v vid, a v vide mi mozhem po nim uzhe projtisj, i v nuzhnom nam formate, vivesti poluchennije nam dannije
+
+    52. Sejchas poschitajem kolichestvo zaprosov, i budem sohranjatj eti samije zaprosi:
+        - v class Db u nas budet dva svojstva, pervij public static, nazovjom $countSql, po umolchaniju znachenije budet 0:
+            - public static $countSql = 0
+        - a v nevo mi budem zapisivatj kolichestvo vipolnenih sql zaprosov
+        - vtoroje svojstvo anologichnoje toljko nazovjom jevo $queries = [], budet pustoj massiv, v kotorij mi budet sohranjatj, ili
+          zapisivatj vsje nashi zaprosi
+
+    53. Chtobi eto vsjo sdelatj u nas jestj dva metoda execude($sql) i query($sql), kotorije mi ispoljzujem, poetomu v execute $countSql uvelichivajem na jedinicu:
+        - self::$countSql++;
+        - tozhe samoje delajem dlja metoda query($sql)
+        - Chto kasajetsja massiva $queries, v execute($sql) i v $query($sql) propisivajem self::$queries v kotorij mi zapishem ocherednoj sql zapros:
+            - self::$queries[] = $sql;
+
+    54. V default.php shablone propisivajem:
+        - <?= debug(\vendor\core\Db::$countSql)?>
+          <?= debug(\vendor\core\Db::$queries)?>
+            // chtobi uvidetj skoljko zaprosov, i kakije bili sozdani
+
+            Na dannom etape u nas toljko odin poleznij metod, eto findAll(), kotorij vborajet vsje dannije iz tablici, hotelosj bi
+            sozdatj metod findOne(), kotoraja viberet kakujuto konkretnuju zapisj, findBySql(), kotorij pozvolit vipolnitj proizvoljnij sql zapros.
+
+
+
+       ===============================================================================================================================
+
+            Modelj i rabota s bazoj dannih chastj 1
+
+    55. Prodolzhajem rabotj s modelju, s klasom Db, v obshjem s komponentom otvechajushij za poluchenije dannih, za rabotu s dannimi,
+        v obshejm za rabotu s bazoj dannih
+
+    53. Mi uzhe nachali pisatj nashu modelj, i napisali dva metoda:
+        - metod query(), kotorij delajet prosto sql zapros, pri etom ne vozvrashjajet nikakih dannih.
+        - metod  findAll(), kotorij pozvoljajet poluchitj dannije dlja tekushej modeli
+        - sledujushij metod kotorij mi napishem, eto metod findOne():
+            - rabotajet po id, po tomu polju kotorij javljajetsja pervichnim kljuchjom tablici
+
+    54. Poetomu nam potrebujetsja svojstvo v kotorm budem hranitj nazvanije pervichnovo kljucha:
+        - v modele sozdajom svojstvo protected s nazvanijem k primeru $pk gdje po ulmochaniju budet pole 'id':
+            - protected $pk = 'id';
+             // budet u nas soglashenije chto poljzovatelj dolzhen nazivatj pole pervichnovo kljuchja v tablice imenno 'id'
+        - daleje sozdajom metod findOne($id, $field = '') v Model.php
+            - pole $field budet ukazivatj po kakomu polju mi hotim vibiratj dannije, sootvetstvenno dannoje pole u nas budet javljatsja ne obezateljnim
+        - daleje v metode mi proverjajem, jeslji u nas pole $field peredano, togda mi budem bratj jevo, jesli zhe ne peredanno, to budem bratj kakraz svojstvo $this->pk, kotoroje po umolchaniju u nas id, libo to chto opredeljim v nashej modeli
+            - $field = $field ?: $this->pk;
+        - i tovo u nas $field jeslji ne peredajom u nas budet zapisano $id, libo zhe zapisano budet jeslji mi peredali to chto ukazal poljzovatelj.
+        - formirujem sql zapros -> vibratj vsjo iz nashej tablici {$this->table}, gdje nashe polje $field ravnjajetsja tomu chto peredadim v $id, eto budet znachenije, dobavljajem jeshjo LIMIT 1
+            - $this->sql = "SELECT * FROM {$this->table} WHERE $field = $id LIMIT 1"
+            - return $this->pdo->query($sql); <- vozvrashajem zapros
+        - dolzhno smushjatj sledujusheje, mi v dannij sql zapros peredajom nekij parametr iz vne, tojestj po umolchaniju mi mozhem vzjatj etot parametr
+          iz adresnoj stroki, naprimer poljzovatelj hochet posmotretj kakojnibudj odin post, odnu statju, dlja etovo on klikajet po ssilke, podrobneje dopustim
+          i sootvetstvenno cherez adresnuju stroku, mi poluchajem id toj zapisi kotoruju, on hochet posmotretj. I sdesj uzhe vozmozhna sql injekcija,
+          poskoljku vmesto id, vmesto kakovoto chisla, poljzovatelj mozhet peredatj v adresnuju stroku chto ugodno.
+          I jeslji eto sql injekcija, to mi dolzhni ispoljzovatj podgotovlennoje virazhenije, i ne podstovljatj naprjamuju, to chto poluchajem ot poljzovatelja.
+          Poetomu vmesto $id, mi ispoljzujem odin iz variantov podgotovlennih virazhenij v PDO, stavim znak voprosa ?:
+            - $sql = "SELECT * FROM {$this->table} WHERE $field = ? LIMIT 1";
+            - i vtorim parametrom peredajom massiv [$id] v -> return $this->pdo->query($sql, [$id]);
+
+
+    55. Tak kak mi v metod query, a eto metod klasa Db, peredajom uzhe ne odin a dva parametra, odin eto sql zapros, a vtoroj eto massiv parametrov,
+        to sootvetstvenno i v klase Db, v metode query mi dolhzni ukazatj eti samije parametri, kotorije u nas ne objazateljni, i po
+        umolchaniju eto imenno pustoj massiv:
+            - public function query($sql, $params = [])
+        - i eti $params mi peredajom nizhe v execute()
+        - i logichno eto sdelatj dlja dannovo metoda execute:
+            - public function execute($sql, $params = [])
+            -return $stmt->execute($params);
+    56. Teperj ot sql injekciji mi zashishjajemsja
+
+    57. Teperj protestirujem rabotu nashevo zaprosa. Perehodim v MainController, i v actione propisivajem:
+        - $post = $model->findOne(2)
+
+    58. Teperj metod findOne() mozhem protestirovatj i dlja drugih polej, naprimer vibiratj ne po polju id, a po polju name naprimer
+        - Naprimer mi hotim vibratj post po polju name, to:
+            - $post = $model->findOne('Kotikova', 'surname'); <- 'Kotikova' eto propisanoje pole, 'surname' eto nazvanije propisanovo polja,
+                no vivoditsja vesj post celikom, vmeste s opisanijem. Tojestj vibirajem pole kotoroje nazvano 'surname',
+                i tam 100+ postov, zatem propisivajem nazvanije posta pod surname, tak mi viberem nuzhnij post.
+        - Proshe konecno ispoljzovatj etot metod findOne(), po umolchaniju, tojestj po id. Peredal nomer id, i vsjo gotovo.
+        - Jeslji vkladka id ne sushestvujet, no jestj naprimer post_id, ili category_id, to v Main.php prosto pereopredeljajem
+          kljuchj $pk:
+            - public $pk = 'category_id';
+
+    59. Sledujushij metod kotyorij napishem eto budet findBySql(). Dannij metod pozvoljajet vibratj chtolibo iz bazi dannih po
+        proizvoljnomu sql zaprosu, takoj metod jestj v ljubih freimvorkah.
+        Kogda nas ne ustraivajet, libo nam ne dostatochno teh metodov, kotorij nam predlagajet framework, takih vot tipo findAll, findOne,
+        sootvetstvenno mi mozhem vipolnitj nekij proizvoljnij zapros, ispoljuzja metod findBySql().
+        - Sozdajom v Model.php publichnij metod findBySql($sql, $params = []) <- parametrom prinimajem sql zapros, i prinimajem massiv parametrov $params = [], kotorij opcionalen
+            - public function findBySql($sql, $params = [])
+            - vnutri propisivajem -> return $this->pdo->query($sql, $params);
+
+    60. Chtobi protestirovatj, propisivajem v MainController:
+        - $data = $model->findBySql("SELECT * FROM {$model->table} ORDER BY id DESC LIMIT 1");
+          debug($data);
+        - $data = $model->findBySql("SELECT * FROM {$model->table} WHERE surname LIKE ?", ['%a%']);
+            // osushestvljajem viborku po surname gdje sovpadajet v dannom sluchaje bukva a, sovpadenije zapisivajetsja kak otdeljnij massiv ['%a%']
+
+    61. Poslednij metod kotorij napishem eto budet metod specialjno dlja zaprosov vida LIKE, chtobi nam ne putatj poljzovatelja, i ne zastavljatj
+        jevo pisatj vot takije vot konstrukciji kak $data v 60 punkte. Dlja etovo mi napiashem specialjnij metod:
+            - v Models.php sozdajom metod, nazovjom k primeru findLike(), budet prinimatj tri parametra:
+                - pervij eto $str <- stroka nekaja
+                - vtoroj eto $field <- pole
+                - tretij et $table = '' <- tablica, po umolchaniju budet bratsja tekushjaja tablica
+                    - public function findAll($str, $field, $table = '')
+            - razberjomsja srazu s tablicej. V metode propisivajem $table ravnjajetsja jeslji u nas peredana $table, to berjom jejo,
+              v protivnom sluchaje berjom tablicu modeli.
+                - $table = $table ?: $this->table
+            - s tablicej razobralisj, teperj pishe sql zapros:
+                - $sql = "SELECT * FROM $table WHERE $field LIKE ?";
+                - return $this->pdo->query($sql, ['%'.$str.'%'];
+
+    62. Sejchas proverjajem chto iz etovo poluchilosj. V MainController, takzhe sozdajom $data s zaprosom na findAll():
+        - $data = $model->findLike('r', 'name'); <- 'r' eto sovpadenije znachenija, v dannom sluchaje  bukvi, v nazvanije polja iz tablici, 'name' eto nazvanije polja iz tablici
+
+
+               ===============================================================================================================================
+
+
+               tak kak takih metodov, mozhet bitj ochenj mnogo, razumneje ispoljzovatj kakujunibudj ORM, budem ispoljzovatj RedBeanPHP ORM
+
+    63. RedBeanPHP eto ORM sistema, budem rbotatj s zapisjami v vide objektov, tojestj odna zapisj iz bazi dannih, eto odin objekt,
+        mnozhestvo zapisej eto massiv objektov, polja tablicej s kotoroj mi sejchas rabotajem, eto nichto inoje kak svojstvo objektov.
+
+    64. Skachivajem s of sajta, razarhivirovivajem, i kopirujem fajl rb.php v public papku pokachto.
+        - tamzhe v papke public sozdajom fajl i nazivajem k primeru test.
+        - poprobujem podkljuchitj jego, i sojeedenitsja s bazoj dannih.
+
+    65. - Dlja nachala v sozdannij fajl test.php podkljuchajem fajl rb.php cherez require.
+        - Daleje po dokumentaciji sozdajom sojedinenjie s bazoj dannih cherez R::setup()
+            - Dlja etovo podkljuchajem config_db.php:
+                - $db = require '../config/config_db.php';
+            - I v setup() peredajom sojedinenji z bazoj dannih:
+                - R::setup($db['dsn'], $db['user'], $db['pass'], $options)
+            - Dlja tovo chtobi uznatj bilo li ustanovleno sojedinenji s bazoj dannih, vardampim metod testConnection:
+                - var_dump(R::testConnection()), jeslji vernjot true, to jestj sojedinenije, jeslji false, to net,
+                  v dannom sluchaje sojedinenije uspeshno.
+        - Daleje idjom. Ispoljzujetsja metod dispense.
+            // Kstate vsje eti objekti, s kotorimi rabotajet biblioteka RedBeanPHP, oni nazivajetsja v kontekste dannoj biblioteki Beans
+        - Dlja tovo chtobi rabotatj daljshe, mi dolzhni sozdatj etot samim bean, proshje govorja objekt, sdelatj eto mozhno s pomoshju
+          metoda despense, kotorij sozdajot objekt post, v kachestve parametra peredajom nazvanije tablici, daleje zapolnjajem
+          nekije svojstva dannovo objekta. Svojstva budut sootvetstvovatj imenam polej v etoj tablice.
+        - Dlja primera sozdadim tablicu kategorij:
+            - $category = R::dispense('category') <- nazvanije peremennoj dolzhno sovpadatj imenno s nazvanijem v dispense
+            - daleje sozdadim v dannoj tablice dva polja:
+                - pole id, dolzhno bitj u ljuboj tablice, ne zapolnjajem eto pole, eto za nas sdelaje RedBean,
+                    // Po umolchaniju sozdajot v kazhdoj tablice pervichnij kljuch, avto inkriment
+                - pole title, nazvanije kategoriji:
+                    - $cat->title = 'Category 1'
+                - daleje sohranjajem v peremennoj $id:
+                    $id = R::store($category)
+            - proverjajem bazu dannih, i vidim chto tablica sozdana pod nozvanijem category, i v nej tablica s dvumja poljami:
+                - pervoje eto sozdanij id, avtomaticheski,
+                - vtoroje eto nazvanije title, v dannom sluchaje Category 1
+        - Sozdadim jeshjo parochku zapisej, prosto pomenjajem title, i perezagruzim brauzer, vot i zapisi sozdalisj.
+
+    66. Po umolchaniju pri sozdaniji polej, varchar prisvaivajetsja v 191 simvol. No RedBean po nuzhde menjajet tablici, eto ne sovsem horosho,
+        jeslji uzhe na finishe razrabotka, na prodakshene, poetomu propisivajem R::freeze(true)
+
+    67. Daleje operacija Read. Chtenije dannih. Dlja chtenija dannih jestj mnozhestvo metodov, naprimer jestj metod load:
+        - $category = R::load($type, $id) <- pervim parametrom imja tablici s kotoroj hotim prochestj dannije, i vtorim parametrom, peredajom $id zapisi, kotorj hotim poluchitj
+        - i sejchas mi mozhem rabotatj s poluchennimi dannimi kak s objektom naprimer:
+            - echo $category->title,
+            - echo $category['title']; <- libo kak s massivom.
+
+    68. Daleje Update. Izmenenije naprimer nazvanija title v polja v tablice.
+        - pervim delom poluchajem v vide objekta:
+            - $category = R::load('category', '2');
+        - vo vtorih pishem novoje znachenije:
+            - $category->title = 'Cat'
+        - i sohronjajem, dlja sohranenija ispoljzujem metod R::store()
+            - R::store($category)
+
+    69. Delete. Poslednjaja operacija kotoruju rassmotrim, eto udalenije zapisi.
+        - Dlja tovo chtobi udalitj zapisj, mi jejo dolzhni poluchitj:
+            - $category = R::load('category', '2');
+        - Daleje ispoljzujem metod trash:
+            - R::trash($category) <- etot metod udalit odnu zapisj, treshAll() mozhet udalitj srazu neskoljko objektov.
+        - Jeslji hotim udalitj vsju tablicu, peresozdatj jejo zanovo, metod nazivajetsja R::wipe():
+            - R::wipe($category)
+                // vsje zapisi udaleni, tablica category ochishena
+
+
+                    ===============================================================================================================================
+
+    70. Otvet na dolgozhdannij vopros - jeslji nas tranice neskoljko blokov kontenta, spisok statej, blok novostej, blok s banerami naprimer,
+        kak eto poluchitj????
+            - Vsjo eto poluchajetsja v odnom kontrollere i v odnom actione, prosto eto budet raznije zaprosi k baze dannih.
+            - v RedBeanPHP u nas budet vsjo nemnozhko proshje, nam ne nuzhno budet sozdavatj otdeljno neskoljko objektvo modelej, jelsji mi hotim
+              obratirjsa k raznim tablicam,  nam bude dostatochno vsjego navsjevo odnovo objekta modeli, dlja tovo chtobi u nas sozdalsja,
+              objekt sojedinenija s bazoj dannih, chtobi moglji sojedinitsja i v daljnejshem vipolnjatj zaprosi.
+        - daljej podkljuchim RadBeanPHP, poetomu v MainController udaljajem zaprosi vo pervih, potomuchto budet ORM sistema iz vne podkljuchena.
+        - V klasse Db, komentirujem:
+            - $options ...
+            - $this->pdo = new \PDO($db['dsn'], $db['user'], $db['pass'], $options);
+            - execute, i query metodi
+        - Teperj podkljuchajem sam ResBeanPHP:
+            - V klass Db.php podkljuchajem:
+                - $db = require ROOT . '/config/config_db.php';
+                  require 'rb.php';
+                  R::setup($db['dsn'], $db['user'], $db['pass']);
+                  R::freeze(true);
+                  R::fancyDebug(TRUE);
+            - kopirujem samu biblioteku rb.php v vendor/libs
+        - Sozdajom konstantu libs v index.php:
+            - define('LIBS', dirname() . '/vendor/libs')
+
+    71. S bazoj sojedinilisj, ostalosj podkljuchitj toljko ljubuju modelj, chtobi poluchitj objekt sojedenenija, i vipolnjatj uzhe zaprosi, ispoljzuja klass \R::
+
+    72. V MainController,tam modelj u nas jestj:
+            - $model = new Main();
+        - $posts = \R::findAll('posts'); <- tablica postov, kotoruju mi vivodim v $this->set(compact('posts'))
+        - dostanem tablicu kategorij jeshjo zaodno dlja trenirovki. Naprimer menu:
+            - $menu = \R::findAll('category')
+                // Pri etom mi ne sozdovali otdeljnuju modelj, u nas jestj toljko modelj Main i vsjo, modelji category net.
+                   Ranjshe nam nuzhna bila modelj, dlja tovo chtobi ukazatj s kakoj tablicej mi rabotajem, i kakoj pervichnij kljuch, no sejchas nam eto dazhe ne nuzhno
+        - vivodim menu v vide views/Main/index.php ciklom foreach, oformlenije vozjmjom s bootstrap
+            - <nav class="nav">
+                  <?php foreach ($menu as $m) : ?>
+                  <a href="category/<?= $m['id']?>"><?= $m['title']?></a> // v silke vivodim id, i v nazvaniji sam title
+                  <?php endforeach;?>
+              </nav>
+
+    73. Kak poluchatj dannije iz razlichnih tablic, mi uznali. Vipolnili dva zaprosa, i poluchili dlja nachala menu, i potom posti
+
+    74. Mi sozdavali obshjij controller AppController, gdje mi mozhem propisatj obshjuju logiku, odnu dlja vesj, naprimer jeslji nam nuzhno vivest
+        menu, kotoroje ne budet menjatsja voobshje negdje, vivozim jevo v obshjij shablon, gdje komponenti ne budut menjatsja, no budet menjatsja toljko kontent.
+        - Sejchas menu dostupno i v vide i v shablone, no vot etot kod -> $menu  = \R::findAll('category'); <- dolzhni vipolnjatj v kazhdom kontrollere,
+          v kazhdom actione v kotorm mi hotim poluchitj eto menu. Poka eto ne vizivajet problem, poskoljku u nas toljko odna stroka, no menu mozhet bitj slozhnim
+          mnogourovnevoje, vipodajusheje naprimer, i vot sdesj mi dolzhni kakto jevo stroitj. Tojestj mi dolzhni poluchitj snachalo vsje elementi v massiv,
+          zatem iz etih elementov sdelatj derevo, tojesjt chtobi dochernij punkt menu nahodilsja v podmenu itd. I tut uzhe dostatochno slozhnaja logika,
+          kotoruju prihoditsja dublirovatj, eto uzhe ne ochenj horosho. I vot chtobi takovo ne bilo, mi mozhem etu slozhnuju logiku, etot obshij kod
+          vinesti v obshij kontroller.
+        - Jeslji nam nuzhen kod kotorij dolzhen vipolnjatsja avtomaticheski, obrashjajemsja k konstruktoru:
+            - public $menu;
+              public function __construct($route)
+                {
+                    parent::__construct($route)
+                }
+                    // Objazateljno vipolnjatj roditeljskij konstruktor, chtobi ne zateretj nash marshrut $route
+            - i vot sdesj mi mozhem poluchitj nashe menu:
+                - new \app\models\Main;
+                - $this->menu =  \R::findAll('category');
+            - i v indexAction propisivajem:
+                - $menu  = $this->menu;
+            - Vot i poluchili menushku. No eto prostoj kod, mozhet bitj gorazdo slozhneje, poetomu etim metodom udobnej poljzovatsja
+
+    75. Vivedem metadannije hardkodom propisanije.
+        - Metadannije eto nekij povtorjashijsja kod, a jeslji eto tak, to jevo mozhno vpolne vinesti v appController.
+        - Naprimer sozdatj nekij metod v AppController, kotorij budet zapolnjatj metadannije.
+        - Sozdadim takoj metod:
+            - protected function setMeta($title = '', $description = '', $keywords = ''), budet imetj nekije parametri:
+                - $title = '' <- po umolchaniju javljajetsja pustoj strokoj
+                - $description = '' <- takzhe pustaja stroka
+                - $keywords = '' <- takzhe pustaja stroka
+        - u nas budet nekij pustoj massiv $meta:
+            - public $meta = [];
+        - daleje propisivajem:
+            - protected function setMeta($title = '', $description = '', $keywords = '')
+              {
+                  $this->meta['title'] = $title;
+                  $this->meta['description'] = $description;
+                  $this->meta['keywords'] = $keywords;
+              }
+        - teperj u nas dostupno svojstvo $meta, kotoraja javljajetsja massivom, v kazhdom kontrollere. I vsjo chto ostajotsja sdelatj, eto jevo zapolnitj dannimi.
+        - Naprimer v MainController v indexAction mi vizivajem:
+            - $this->setMeta('Main Page', 'Descr of Page', 'Keywords of Page')
+        - zasovivajem v peremennuju $meta:
+            - $meta = $this->meta
+        - i vizivajem v compact()
+        - teperj u nas v shablone dostupen massiv $meta
+        - Dlja kazhdoj stranici, nam dostatochno vsjego navsjego vizvatj metod setMeta(), i v kachestve parametra peredatj jemu title, description i keywords
+
+    76. Vivedem metadannije s bazi dannih.
+        - Jeslji u nas vsjo hranitsja v baze dannih, naprimer mi prosmatrivajem konkretnij post, konkretnuju statju, to mi dostajom konkretnuju statju:
+            - $post = \R::findOne('posts', 'id = 2'); <- poluchili post s id = 2 iz tablici posts.
+        - tam hranitsja massiv s postom, tam i description i keywords jestj.
+        - I mi prosto obrashjajemsja k nashemu massivu post i k jevo svojstvam :
+            - $this->setmMeta($post->title, $post->description, $post->keywords)
+        - Takzhe ne zabivajem chtobi vivesti odin post iz tablici, ne nuzhno v vide prohoditj ciklom foreach, prosto delajem zapros v kontrollere:
+            - new Main;
+              $post = \R::findOne('posts', 'id = 1');
+        - daleje vizivajem chto nam nuzhno, a konkretno keywords, description:
+            - $this->setMeta($post->title, $post->description, $post->keywords);
+              $meta = $this->meta;
+        - daleje vizivajem v metode set(compact()):
+            - $this->set(compact('meta', 'post'));
+
+    77. Vsjo dostali iz tablici, tozhno takzhe postupajem i dlja kategoriji, naprimer u nas jesjttablica kategoriji, sozdajom u nejo polja
+        description, keywords, i pri obrasheniji k konkretnoj kategoriji mi poluchim imenno jejo metadannije
+
+            ===============================================================================================================================
+
+          Rabota s komponentami.
+
+    78. Eto mogut bijt nashi biblioteki, takzhe storonnije. Pervoje eto klass Keshirovanija:
+        - eto budet prostenjkij klass kotorij budet prosto keshirovatj dannije, sohranjatj kesh v fajl, i sootvetstvenno mi mozhem schitivatj
+          dannije iz fajla uzhe gotovije, i sobstvenno ispoljzovatj ih v nashem prelozheniji
+        - Sozdadim sootvetstvujushij klass v vendor/libs/Cache.php, i testovij klas test.php.
+            - i tamzhe mogutj bitj mnogo drugih klassov, desjatki naprimer, i nashemu prilozheniju mozhet potrebovatsja ispoljzovatj 10 klassov,
+              sootvetstvenno chtobi ispoljzovatj eti samije 10 klassov, nam nuzhno sozdatj 10 objektov. Jelsji nam nuzhen objekt dannovo
+              klassa, to nam nuzhno jevo sozdatj ispoljzuja kljuchevoje slovo new. I predstavim schto mi v kakom nibudj kontrollere v kotorom
+              mi rabotajem dopustim MainController, budem sozdavatj odin new, vtoroj new, tretij new itd. Predstavim chto nam nuzhno
+              v kakih nibudj jeshjo komponentah, vidzhetah dopustim tozhe samoje sdelatj, tozhe samoje new, kakoj nibudj objekt poluchitj,
+              v obshjem vsjo eto privodit k razrastaniju nashevo koda, i poetomu ne ploho bilo bi
+                - pridumatj kakuju nibudj shtuku chtobi mi mogli vo pervih uzhe rabotatj s zaraneje sozdannim klassom,
+                  tojestj pridumatj chtoto vrode avtozagruzki, tochneje avtosozdaniji objektov.
+                - chtobi mogli poluchitj dostup k sozdannomu uzhe objektu raneje, i s ljuboj tochki nashevo prelozhenija, hotj iz actionov v kontrollere,
+                  hotj iz vida, itd.
+
+    79. Tut mi podoshlji jeshjo k odnomu shablona-projektirovaniju / patternu Registry(Reestr). sutj zakljuchajetsja v sledujushem:
+        - u nas jesstj nekij klas, v kotorom jestj nekoje svojstvo, i eto svojstvo javljajetsja konteinerom/massivom, i tuda mi mozhem
+          pomestitj sozdovajemije objekti. Objekti iz konfiguraciji mozhno sozdatj ih, na letu mozhno sozdatj, dopustim:
+            - obratilisj k konteineru i kladjom tuda sozdovajemije objekti, i on nam dostupen v ljuboj tochki nashevo prelozhenija, kak i
+              sozdannije, polozhennije iz konfiguracij objekti raneje.
+        - u nas jestj nekij konteiner kuda mozhno polozhitj sozdovajemije objekti, takzhe mogut bitj konteiner dlja vsjevozmozhnih nastrojek
+          nashevo prelozhenija.
+        - takzhe etot klass reestr dolzhen kak minimum imetj v sebe jeshjo dva metoda eto getr, i setr:
+            - getr - budet dostavatj iz konteinera nuzhnij nam objekt libo nastrojku
+            - setr - budet klastj vsjo eto delo tuda.
+
+    80. Na budusheje sozdadim novij fajl konfiguraciji config.php v papke config, v kotorom budet massiv $config = [].
+        V etom fajle budet vsjevozmozhnaja konfiguracija nashevo projekta, komponenti, nastrojki, vsjo chto mozhem ispoljzovatj v projekte
+        On sobstvenno i budet vozvrashjatsja:
+            - return $config;
+
+    81. Zapisivajem v $config.php :
+        - 'components' => [] // te klassi kotorije dolzhni bitj v avtozagruzke, kotorije dolzhni zagruzhatsja pri inicializaciji nashevo prelozhenija
+            - ['cache' => 'vendor\libs\Cache'] <- kljuchom dannovo masiva komponents budet naimenovanije objekta, tojestj kak mi budem k nemu v daljnejshem obrashjatsja
+                // 'vendor\libs\Cache' <- putj k klasu ot kotorovo mi sozdajom objekt
+
+    82. Dlja testa v papke public sozdadim papku test, v kotorom i porabotajem, prosto chtobi ponjatj kak ustrojen shablon reestr, i chto iz sebja predstavljajet.
+        V papke test sozdadim fajl index.php v njem class Registry, i sozdadim jeshjo odnu papku classes v papke test.
+        V papke classes sozdajom class Cache naprimer, i Test,  i v Test klasse propisivajem:
+            - public function go()
+              {
+                  echo 'Pognali';
+              }
+                    // Chtobi ubeditsja chto vsjo abotajet.
+
+    83. Zadacha u nas ponjatj kak ustrojen voobshje shablon projektirovanija Registr, i kak s nim rabotatj. Propisivajem v index.php fajle v papke public/test v class Registry :
+        - public static $objects = [] //
+        - Daleje nam potrebujetsja zashishjonoje staticheskoje svojstvo instance:
+            - protected static $instance;
+        - I zashishjonnij konstruktor:
+            - protected function __construct(){}
+        - kopirujem s Db.php $instance:
+            - public static function instance()
+                  {
+                      if (self::$instance === null)
+                      {
+                          self::$instance = new self;
+                      }
+                      return self::$instance;
+                  }
+        - teperj nam dostatochno obratitsja k metodu instance ne sozdovaja objekta, i mi poluchim objekt dannovo klassa Registry.
+
+    84. Dlja ponjimanija, chtobi prosto ponjatj kak rabotajet, kopirujem funkciju avtozagruzki v verh fajla, i massiv config.
+
+    85. Daleje mi hotim na letu sozdatj dva objekta, chtobi pri inicializaciji nashevo prilozhenija, mi uzhe imeli bi dva objekta cache i test.
+        Nu i pri etom moglibi sozdavatj i novije objekti v etot konteiner v predelah nashevo prilozhenija.
+
+    86. Vozjmjom peremennuju $config, propishem jejo v __construct():
+            - global $config;
+        - Daleje ciklom foreach projdjomsja po nashemu $config['components']:
+            - foreach ($config['components'] as $name => $component){self::$objects[$name] = new $component;}
+        - Teperj poluzhajetsja chto u nas v konteinere $objects, budet nahoditsja object(new $component) s ukazanim imenem[$name], tojestj cache, i test.
+        - Eti objekti mi dolzhni kakto poluchitj
+
+    87. Propisivajem praviljnije puti, eto:
+            - $config = [
+                  'components' => [
+                      'cache' => 'classes\Cache',
+                      'test' => 'classes\Test'
+                  ],
+              ];
+        - Sozdajom funkciju chisto dlja proverki, chtobi ubeditsja chto kod rabotajet:
+            - public function getList()
+                  {
+                      echo "<pre>";
+                      var_dump(self::$objects);
+                      echo "</pre>";
+                  }
+            - $app = Registry::instance();
+              $app->getList();
+                // vizivajem.
+
+    88. I vot u nas poluchilosj Soderzhimoje nashevo konteinera, tam jestj dva objekta, pervij eto objekt cache,vtoroj eto objekt test
+
+    89. V ljuboj moment nam dostatochno prosto poluchitj nuzhnij objekt, prosto v massiv komponents dopisatj nazvanije etovo objekta i putj k nemu.
+
+    90. i Mi poluchajem v itoge v konteinere $objects, nuzhnij objekt kotorij sozdan avtomaticheski, i mi k nemu vsjegda budem imetj dostup.
+
+    91. No dlja tovo chtobi imetj k nemu dostup nam neobhodimo propisatj kak minimu jeshjo odin metod:
+        - eto dolzhen bitj getr, i tut mi ispoljzujem moagicheskij metod get, v kachestve parametra prinimajem imja tovo objekta kotorij hotim poluchitj
+            - public function __get($name){}
+        - Takzhe potrebujetsja srazu metod __set()
+
+    92. __get() i __set() eto magicheskije metodi. Oni vizivajutsja avtomaticheski v tom sluchaje, jeslji proishodit obrashenije k neizvestnomu svojstvu.
+        Tojestj k svojstvu kotorovo net u nashevo objekta:
+            - jeslji mi vizovjom svojstvo kotoro net, naprimer:
+                - $app->test
+            - to v etom sluchaje mi uvidim to chto viveli na v metode __get()
+        Poetomu delajem proverku v metode --get()
+            - if(is_object(self::$objects[$name])){return self::name}
+        - Sejchas pri vizove :
+            - $app->test->go() <- popadajem v Class Test.
+
+    93. __set nam nuzhen dlja tovo chtobi pomeshjatj objekti ne toljko avtomaticheski i konfiguraciji naprimer, no jeshjo i gdje nibudj v actione
+        sozdatj objekt, pomestitj jevo v konteiner, chtobi v daljnejshem im poljzovatsja, znachit eto mozhno sdelatj s pomoshju metoda __set():
+            -
+
+
+

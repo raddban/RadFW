@@ -1,0 +1,10 @@
+1. Skachivajem git i ustanavlivajem na mashinu https://git-scm.com/
+2. Preferences -> search(git) -> test -> Git Executed Succecsfully
+3. Za kontrolj versiji otvechajet vkladka VCS -> Version Control System.
+4. Kontrolj versiji rabotajet s repozitorijami, poetomu dlja nachala nuzhno sozdatj:
+    - VCS -> Import Into Version Control -> Create Git Repository
+    - vibirajem papku v kotorj neobhodimo sozdatj repozitorij.
+5. Posle etovo budet sozdana vetka master.
+6. Dobavljajem vsje neobhodimije fajli v git, alt+cmd+a, chtobi videlilosj zeljonim cvetom
+7. Daleje sohronjajem. Commit nazivajetsja. Kommitim cmd+k
+8. Kommiti objazateljno dolzhni soderzhatj kakojto tekst, bez komentarija neljzja budet zakomititj
