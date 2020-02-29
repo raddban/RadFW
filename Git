@@ -8,3 +8,5 @@
 6. Dobavljajem vsje neobhodimije fajli v git, alt+cmd+a, chtobi videlilosj zeljonim cvetom
 7. Daleje sohronjajem. Commit nazivajetsja. Kommitim cmd+k
 8. Kommiti objazateljno dolzhni soderzhatj kakojto tekst, bez komentarija neljzja budet zakomititj
+9. VCS -> GIT -> Remote -> + -> kopirujem ssilku kotoruju dali pri registraciji repazitorija
+10. daleje kommit&push cmd+k
