@@ -2,12 +2,14 @@
 namespace app\controllers;
 
 use app\models\Main;
+use vendor\core\App;
 
 class MainController extends AppController
 {
     public $layout = 'default';
     public function indexAction()
     {
+//        App::$app->getList();
 //        $this->layout = false;
 //        $this->layout = 'main';
 //        $this->view = 'test';
@@ -20,15 +22,27 @@ class MainController extends AppController
 //        $data = $model->findLike('r', 'name');
 //        debug($data);
 
+
         $model = new Main();
-//        $posts = \R::findAll('posts');
-        $post = \R::findOne('posts', 'id = 1');
+//        $posts = App::$app->cache->get('posts');
+        $posts = App::$app->cache->delete('posts');
+        if (!$posts)
+        {
+            $posts = \R::findAll('posts');
+//            App::$app->cache->set('posts', $posts, 3600*24);
+        }
+
+
+//        echo date('Y-m-d H:i', time());
+//        echo "<br>";
+//        echo date('Y-m-d H:i', 1583091738);
+//        $post = \R::findOne('posts', 'id = 1');
 //        debug($post);
         $menu  = $this->menu;
 //        $this->setMeta('Main Page', 'Descr of this Page', 'Keywords of this Page');
-        $this->setMeta($post->title, $post->description, $post->keywords);
+//        $this->setMeta($post->title, $post->description, $post->keywords);
         $meta = $this->meta;
-        $this->set(compact(  'post', 'menu', 'meta'));
+        $this->set(compact(  'posts', 'menu', 'meta'));
     }
 
 

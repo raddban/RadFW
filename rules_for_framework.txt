@@ -954,7 +954,115 @@ Nachinajem....
 
     93. __set nam nuzhen dlja tovo chtobi pomeshjatj objekti ne toljko avtomaticheski i konfiguraciji naprimer, no jeshjo i gdje nibudj v actione
         sozdatj objekt, pomestitj jevo v konteiner, chtobi v daljnejshem im poljzovatsja, znachit eto mozhno sdelatj s pomoshju metoda __set():
-            -
+            - public function __set($name, $object)
+                  {
+                      if (!isset(self::$objects[$name]))
+                      {
+                          self::$objects[$name] = new $object;
+                      }
+                  }
+        - $app = Registry::instance();
+          $app->getList();
+          $app->test->go();
+          $app->test2 = 'classes\Test2';
+          $app->getList();
+          $app->test2->hello();
+
+    94. S pomoshju etih dvuh magicheskih metodov mi mozhem obrashjatsja k nesushestvujushemu objektu, i na letu sozdavatj jevo, i dobavljatj v konteiner, otkuda mi mozhem im poljzovatsja.
 
 
+     ===============================================================================================================================
 
+        Klass keshirovanija
+
+
+    95. Sejchas testovij klass reestra dobavim v nashe jadro
+        - v vendor/core sozdajom klass Registry
+        - kopirujem tuda vesj kod klassa iz public/test/index.php
+
+    96. Naprjamuju dannij klas vizivatj ne budem, poetomu sozdadim nash klass osnovnoj, kotorij v daljnejshem rasshirim.
+
+    97. Sozdajom klass, kotorij budet sozdavatj objekt nashevo reestra:
+            - v vendore/core sozdajom klass App
+                - u nego budet nekoje svojstvo statichnoje s nazvanijem k primeru takzhe $app:
+                    - public static function $app
+            - sozdajom konstruktor, budet zapolnjatj tekusheje statichnoje svojstvo - objektom nashevo reestra:
+                - self::$app = Registry::instance();
+            - ostalosj sozdatj objekt dannovo klassa app v nashem front kontrollere, i u nas budet dostupen objekt srazu zhe reestra
+                - v public/index.php propisivajem:
+                    - new \vendor\core\App
+
+    98. Sejchas proverim kak vsjo rabotajet. V MainController vizivem kakojnibudj metod. Tak kak u reestra jestj metod getList, jevo i budet ispoljzovatj:
+            - v MainController indexActionobrashjajemsja k metodu getList:
+                - \vendor\core\App::$app->getList();
+            - vidim chto zaregestrirovano dva objekta s kotorimi mi mozhem v daljnejshem rabotatj
+
+    99. Teperj perehodim neposredstvenno k klasu dlja raboti s keshirovanijem.
+            - Etot klass nuzhen dlja tovo ctobi mi mogli ne povtorjatj odni i tezhi operaciji po mnogo raz. Dlja tovo chtobi snizitj nagruzku,
+              ispoljzujetsja keshirovanije.
+            - vot i mi napishem prostenjkij klass dlja keshirovanija dannih.
+            - Klass keshirovanija na samom dele dostatochno prostoj klass, i dlja nevo dostatochno dvuh-trjoh metodov:
+                - pervij - budet zapisivatj dannije v fajl kesha;
+                - vtoroj - budet schitivatj eti samije dannije;
+                - tretij - mozhet udalitj fajl kesha, jeslji nam on boljshe ne nuzhen
+            - Kak pravilo ispoljzujutsja toljko dva metoda, eto __get(chtobi dostatj dannije) i __set(chtobi polozhitj dannije)
+
+    100. V korne sozdajom papku tmp, i vnutri jejo papku cache. Poetomu jeslji nash skript budet zapisivatj v eti papki, to, jeslji mi ne budem
+         programno na nih ustonavlivatj prova, to sootvetstvenno jeslji rabotajete s unix os, gdje prava na papki nuzhni, to ustanovitj
+         sootvetstvujushije prava na dannuju papku, dlja tovo chtobi mozhno bilo v nejo chtoto zapisivatj
+
+    101. V vendor/libs/Cache.php sozdajom konstruktor, i poka ostavljajem pustim. Takzhe sozdajom dva metoda:
+            - public function set(){} <- budet chtoto lozhitj v kesh
+            - public function get(){} <-
+         Parametri set(). Vo pervih fajlov keshirovanija mozhet bitj mnogo, mi mozhem keshirovatj naprimer posti, tozhe samoje menu itd.
+         Poetomu azhdij vid dannih mi dolzhni klastj v svoj fajl. Dlja tovo chtobi mi mogli ponjatj potom kakoj fajl otvechajet za kakije dannije
+         mi dolzhni ih kakto otlichatj drug ot druga, dlja etovo ispoljzujem parametri:
+            - $key <- eto budet nazvanije dannih kotoroje budem klastj v fajl cache. Naprimer posts, libo menu
+            - $data <- sami dannije
+            - $seconds <- vremja na kotoroje mi keshirujem etoi samije dannije. po umolchaniju stavim 3600. Vremja v sekundah.
+         Daleje vischitajem konechnuju datu dlja keshirovanih dannih, eto nuzhno dlja tovo chtobi, kogda mi popitajemsja poluchitj keshirovannije dannije,
+         mi proverim a ne aktualjni li oni jeshjo. Tojestj posmotrim datu do kotoroj aktualen kesh, i jeslji ona budet menjshe tekushej dati,
+         to sootvetsvenno dannije uzhe ne aktualjni. Jesli tekushaja data menjshe toj na kotoruju dannije zakeshirovani, to sootvetstvenno
+         dannije aktualjno, i mi ih budem daljshe ispoljzovatj.
+            - sozdajom massiv $content[''], poskoljku u nas budut sami dannije, i v etot zhe fajl mi kladjom i vremja okonchanija, ili aktualjnosti
+              etih dannih:
+                - $content['data'] = $data <- pervij element sami dannije
+                - $content['end_time'] = time() + $seconds <- summa tekushevo vremeni + tomu cho peredajotsja v $seconds
+            - v public/index/php sozdadim jeshjo odnu konstantu CACHE kotoraja budet vesti v papku tmp/cache
+            - daleje prostejshij vizov:
+                - if (file_put_contents(CACHE . '/' . md5($key) . '.txt', serialize($content))) <- peredajom putj k fajlu, kuda hotim zapisatj dannije, i vtorim parametrom sami dannije.
+                - jeslji mi uspeshno zapisali serilizovannije dannije, i cache fajl jeslji sozdan, zapisan, to vernjom sami dannije:
+                    - return true;
+                    - else {return false;}
+
+    102. Srazu probujem etot metod proveritj. V MainControllere poluchajem posti, zakeshirujem ih:
+            - App::$app->cache->set('posts'. $posts)
+         Fajl sozdalsja i goden rovno stoljko skoljko mi ukazali v parametre $seconds. Po umolchaniju eto 1h.
+    103. Vot mi i sozdali sistemu keshirovanija dannih. Na dannih etape mi ih zapisivajem bez problem, teperj nam nado ih schitivatj
+            - schitivajem dannije po kljucu $key:
+                - get($key)
+            - daleje proverjajem jeslji u nas file_exists(CACHE . '/' . md5($key) . '.txt'):
+                - if(file_exists($file)) <-  togda mi dolzhni schitatj:
+                - $content = unserialize(file_get_contents(CACHE . '/' . md5($key) . '.txt'))
+            - V peremennuju $content mi schitivajem dannije, i teperj mi proverjajem. Peremennaja $content u nas budet massiv s dvumja elementami:
+                - data
+                - end_time
+            - Dolzhni proveritj aktualen li nash kesh:
+                - if(time() <= $content['end_time']){return['data']}
+                - jeslji ne aktualen, to udaljajem fajl funkcijej unlink($file)
+            - return false <- v tom sluchaje jeslji fajl ne sushestvujet
+
+    104. Srazu zapishem metod delete($key), kotorij budet udaljatj dannije po kljuchju:
+            - proverjajem jeslji fajl sushestvujet, to prosto delajem unlink($file):
+                - if(file_exists($fiel)){unlink($file)}
+
+    105. Proverjajem kak vsjo eto rabotajet. Logika daljnejshaja raboti s keshom:
+            - Sejchas pri kazhdom obnovleniji u nas fajl sozdajotsja zanovo, nam eto ne nuzhno. Nam nuzhno sdelatj sledujushim obrazom.
+            - Snachalo mi pitajemsja poluchitj dannije iz kesha, posle sozdaniji modeli v MainController:
+                - $posts = App::$app->cache->get('posts');
+            - Sootvetstvenno metod get(), vozvrashjajet libo dannije fajla, libo vozvrashajejt false, poetomu mi proverjajem:
+                - jeslji dannije nebili vozvrasheni, to mi dolhzni ih poluchitj, i zapisatj v kesh:
+                    - if(!$posts){
+                        $posts = \R::findAll('posts');
+                        App::$app->cache->set('posts', $posts);
+                    }
