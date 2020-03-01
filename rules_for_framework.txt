@@ -1066,3 +1066,98 @@ Nachinajem....
                         $posts = \R::findAll('posts');
                         App::$app->cache->set('posts', $posts);
                     }
+
+                  ===============================================================================================================================
+
+                    Podkljuchenije skriptov v vidah
+
+    106. Kak podkljuchatjs skripti, i stili v otdeljnih vidah. Mozhet bitj v teh sluchajah kogda jestj dopustim nekij skript javascript, ili dazhe
+         neskoljko strok skripta, kotorije nuzhni ne dlja vsjego prelozhenija celikom, a toljko dlja konkretnih stranic, ili dazhe ldja odnoj
+         voobshje stranici. V etom sluchaje podkljuchatj takoj skript ko vsjemu shablonu net smisla, hotja on vsjo ravno budet zakeshirovan,
+         i pri praviljnoj nastrojke sajta on budet bratsja v sledujushij raz uzhe s kesha brauzera, a ne zaprashivatsja s servera
+
+    107 Ispoljzujut dva podhoda:
+            1. podkljuchajem nuzhnij skript v kontrollere, tojestj v actione kotoraja otvechajet za dannuju stranicu, mi realizovivajem
+               kakoj nibudj metod tipo addScripts() kotorij budet podkljuchatj imenno dlja dannoj stranici nuzhnije skripti.
+            2. Podkljuchatj skripti neposredstvenno v nuzhnom vide. Takoj podhod chasto ispoljzujutsja vo frameworkah.
+
+    108. Pered nami zadacha otpravitj AJAX zapros, chtobi otvetom vozvrashalsja ne vesj shablon, a toljko otvet. Sutj prosta, kogda otpravljajem
+         ajax zapros, to v kachestve otveta poluchajem vsjo to chto vivoditsja na ekran, jeslji hotim poluchitj otvet, to nuzhno organizovatj
+         chtoto vrode echo, libo print_r(), var_dump(), v obshejm lubaja funkcija kotoraja vivodit chtoto na ekran, ili prosto
+         podkljuchenije shablona, kotorij chtoto vivedet opjatj taki na ekran. Nu a tak kak daljshe u nas avtomatom realizovano podkljuchenije
+         shablona i vida, to sobstvenno oni i podkljuchajutsja vmeste s nashim otvetom, i mi poluchajem v kachestve otveta vsjo lishneje i ne nuzhnoje.
+         V etom sluchaje standartnoje reshenije eto ispoljzovatj, posle vivoda nashevo otveta v actione izpoljzovatj funkciju tipo die, libo exit,
+         kotoraja prekratit daljnejsheje vipolnenije skripta.
+         Drugoj variant nash fw podderzhivajet vikljuchenije shablona $this->layout = false, tem samim mi poluchim toljko ajax otvet, i nochego boleje.
+
+    109. Chtobi etot vopros reshitjotkrojem shablon default. I budem otpravljatj ajax zapros po testAction.
+            - budet knopka, kotoruju pomenstim v vid Main v index.php:
+                - <button class="btn btn-default" id="send">Button</button>
+            - pri klike na etu knopku mi hotim otpravitj ajax zapros. Dlja etovo prjamo v shablone napishem inlainovij skript:
+                - <script>
+                      $('#send').click(function () {
+                          $.ajax({
+                              url: 'public/page/about',
+                              type: 'post',
+                              data: {'id': 2},
+                              success: function (res) {
+                                  console.log(res)
+                              },
+                              error: function () {
+                                  alert('Error')
+                              }
+                          })
+                      })
+                  </script>
+            - v konsole mi vidim chto prihodit otvetom vesj shablon, eto ne to chto nam nuzhno. Chtobi izbezhatj takoj situaciji. Perehodim v action
+              v kotorij mi otprovljajem zapros, i vivedem chtoto naprimer 111, i fukciju die.
+            - i tut mi vidim chto dejstviteljno prihodit toljko otvet, i shablon ne prihodit otvetom.
+            - Vo frejmorkah pishut metod isAjax(), kotorij proverjajet postupili li dannije metodot AJAX, tojestj postupili li dannije asinhronno.
+            - v vendor/core/base/Controller.php napishem etot metod:
+                - public function isAjax()
+                  {
+                      return isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER('HTTP_X_REQUESTED_WITH') === 'XMLHttpRequest';
+                  }
+                    - Dannij metod vzjat iz fw yii2. On proverjajet postupili li dannije assinhronno, jeslji eto tak, togda vozvrashjajet true,
+                      inache vozvrashjajet false.
+            - teperj propisivajem v nuzhnom nam actione, v dannom sluchaje eto action v kotorij otprovljajem zapros. I pishem proverku:
+                - if ($this->isAjax()){echo 111; die;}else{echo 222}
+
+    110. Sdelajem tak chtobi skript podkljuchalsja toljko k glavnoj stranice:
+            - dlja etovo virezajem skript s default.php v konce stranici, i vstavljajem v vid otvechajushij za glavnuju stranicu:
+                - app/main/index.php
+            - i dopustim mi tudazhe hotim jeshjo podkljuchitj drugoj skript, naprimer test.js:
+                - i tam mi dopustim poluchajem tekst na knopke:
+                    - $(function(){
+                          alert(('#send').text());
+                      })
+            - No jechas u nas znak dolara ne opredeljon -> ($). Poskoljku u nas jquery podkljuchajetsja posle nashevo sozdannovo skripta,
+              kotorij dolzhen ispoljzovatj jquery. No biblioteka dolzhan podkljuchatjsa ranjshe. Mi dolzhni realizovatj funkcional, kotorij
+              budet iskatj nashi skripti, kak vkljuchajushij fajl tak i inlainovij, i virizatj ih ottuda, virezatj ih, i vstavljatj posle
+              podkljuchenija biblioteki jquery.
+            - Dlja etovo nam potrebujetsja sostavitj reguljarnoje virazhenije:
+                - skopirujem soderzhimoje vida app/views/Main/index.php
+                - zajdjom na sajt https://regex101.com/ i vstavim soderzhimoje v pole TEST STRING
+                - Viberem variant s PHP iz FLAVOR, i sostavim reguljarnoje virazhenije, kotoroje dolzhno najti dva skripta
+                - v REGULAR EXPRESSION pole propisivajem chto mi ishjem:
+                    - menjajem ogranechitelj shablona, zhmjo na tri tochki i vibirajem @
+                    - <script></script>
+                    - tak kak posle otkrivajushevo tega script mogut bitj kakijeto atributi naprimer src, poetomu ukazivajem posle
+                      tega <script :
+                        - <script.*?></script>
+                    - takzhe propisivajem mezhdu <script.*?></script>:
+                        - <script.*?>.*?</script>
+                    - Dobavim flag S
+                    - Teperj u nas jestj dva sovpadenija, match 1, i match 2. Poetomu shablon reg virazhenija gotov, i mi mozhem jevo ispoljzovatj
+            - Perehodim v klass vida:
+                - vendor/core/base/View.php
+            - poskoljku budem virizatj skrepti, to nam potrebujetsja nekoje svojstvo gdje budem ih hranitj. Propisivajem:
+                - public $script = []; <- po umolchaniju pustoj massiv
+            - daleje posle metoda render(), sozdajom protected metod naprimer getScripts()
+                - protected function getScript($content){}
+                    - prinimajet v sebja parametr $content. $content eto vsjo soderzhimoje nashevo vida.
+                    - sootvetstvenno iz etoj peremennoj $content nam nuzhno prosto virezatj skripti, jeslji oni tam jesjt.
+            - Dlja nachala objavim peremennuju $pattern, v kotoroj budet reg virazhenije kotoroje sozdali:
+                - $pattern = "#<script.*?>.*?</script>#si"
+            - Sejchas dolzhni proveritj, jestj li skripti v vidah, jeslji jestj to budem virezatj ot tuda, jeslji net, to virezatj nechevo:
+                - preg_match_all($pattern, $content, $this->script) <- pervim parametrom $pattern, vtorim gdje mi vsjo eto ishjem, v $content, i tretim kuda mi vsjo najdennoje budem skladivatj

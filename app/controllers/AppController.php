@@ -16,8 +16,8 @@ class AppController extends Controller
     {
         parent::__construct($route);
 
-        new Main;
-        $this->menu = \R::findAll('category');
+//        new Main;
+//        $this->menu = \R::findAll('category');
     }
 
     protected function setMeta($title = '', $description = '', $keywords = '')

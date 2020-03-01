@@ -19,6 +19,13 @@ class PageController extends AppController
     {
 //        $this->layout = 'main';
         $model = new Main;
+
+        if ($this->isAjax())
+        {
+            echo 111;
+            die();
+        }
+        echo 222;
         $menu  = $this->menu;
         $this->set(compact('menu'));
     }

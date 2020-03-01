@@ -18,6 +18,7 @@ class View
      * @var str
      * */
     public $layout;
+    public $script = [];
 
     public function __construct($route, $layout = '', $view = '')
     {
@@ -60,5 +61,11 @@ class View
             }
         }
 
+    }
+
+    protected function getScript($content)
+    {
+        $pattern = "#<script.*?>.*?</script>#si";
+        preg_match_all($pattern, $content, $this->script);
     }
 }
